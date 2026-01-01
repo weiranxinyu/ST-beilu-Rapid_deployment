@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 GCLI_DIR="$HOME/gcli2api"
 

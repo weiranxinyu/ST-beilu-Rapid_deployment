@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # 项目名称: ST-Manager (SillyTavern & gcli2api Manager)
 # 描述: 专为 Termux 设计的轻量级管理工具
@@ -10,9 +10,9 @@ IFS=$'\n\t'
 
 # 全局变量
 SCRIPT_NAME="st-manager"
-# 获取脚本当前所在目录
-DIR=$(cd "$(dirname "$0")" && pwd)
-MANAGER_DIR="$DIR/manager"
+REPO_URL="https://github.com/beilusaiying/sillytavern-beilu-Rapid_deployment"
+APP_DIR="$HOME/ST-Manager"
+MANAGER_DIR="$APP_DIR/manager"
 
 # 颜色定义
 RED='\033[31m'
@@ -44,7 +44,7 @@ check_deps() {
     log "检查系统依赖..."
     
     # Termux 基础依赖
-    local deps=(curl unzip git nodejs jq expect python openssl-tool)
+    local deps=(curl unzip git nodejs jq expect python openssl-tool build-essential)
     local missing=()
 
     for dep in "${deps[@]}"; do
@@ -75,11 +75,33 @@ check_deps() {
     fi
 }
 
+# 安装或更新项目
+install_project() {
+    log "正在安装/更新 ST-Manager..."
+    
+    if [[ -d "$APP_DIR" ]]; then
+        if [[ -d "$APP_DIR/.git" ]]; then
+            log "检测到已安装，正在更新..."
+            cd "$APP_DIR" || exit 1
+            git pull || warn "更新失败，请检查网络"
+        else
+            warn "目录 $APP_DIR 已存在但不是 Git 仓库，跳过更新"
+        fi
+    else
+        log "正在克隆仓库..."
+        git clone "$REPO_URL" "$APP_DIR" || err "克隆失败，请检查网络"
+    fi
+}
+
 # 设置权限
 setup_permissions() {
     log "设置执行权限..."
-    chmod +x "$MANAGER_DIR/core.sh"
-    find "$MANAGER_DIR/modules" -name "*.sh" -exec chmod +x {} \;
+    if [[ -f "$MANAGER_DIR/core.sh" ]]; then
+        chmod +x "$MANAGER_DIR/core.sh"
+        find "$MANAGER_DIR/modules" -name "*.sh" -exec chmod +x {} \;
+    else
+        err "核心文件丢失，安装可能失败"
+    fi
 }
 
 # 主函数
@@ -90,6 +112,7 @@ main() {
     echo -e "${BLUE}==============================================${RESET}"
     
     check_deps
+    install_project
     setup_permissions
     
     echo -e "${BLUE}==============================================${RESET}"

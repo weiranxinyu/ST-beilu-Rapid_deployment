@@ -14,7 +14,7 @@ IFS=$'\n\t'
 # ==============================================================================
 SCRIPT_NAME="st-manager"
 DIR=$(cd "$(dirname "$0")" && pwd)
-APP_DIR="$HOME/ST-Manager"
+APP_DIR="$(dirname "$DIR")"
 CONF_DIR="$DIR/conf"
 MODULES_DIR="$DIR/modules"
 SETTINGS_FILE="$CONF_DIR/settings.conf"
@@ -119,10 +119,11 @@ main_menu() {
         
         echo -e "${BLUE}[系统管理]${RESET}"
         echo -e "  ${GREEN}10)${RESET} 修复运行环境 (重装依赖)"
+        echo -e "  ${GREEN}11)${RESET} 更新管理工具 (ST-Manager)"
         echo -e "  ${GREEN}0)${RESET} 退出"
         
         echo -e "${BLUE}==============================================${RESET}"
-        read -rp "请选择操作 [0-10]: " choice
+        read -rp "请选择操作 [0-11]: " choice
         
         case "$choice" in
             1) check_func st_start && st_start ;;
@@ -135,6 +136,7 @@ main_menu() {
             8) check_func gcli_stop && gcli_stop ;;
             9) check_func gcli_logs && gcli_logs ;;
             10) fix_env ;;
+            11) update_self ;;
             0) exit 0 ;;
             *) echo -e "${RED}无效选项${RESET}"; sleep 1 ;;
         esac
@@ -152,6 +154,29 @@ fix_env() {
     fi
     echo -e "${GREEN}依赖修复完成${RESET}"
     pause
+}
+
+# 更新自身
+update_self() {
+    echo -e "${BLUE}正在检查 ST-Manager 更新...${RESET}"
+    cd "$APP_DIR" || return
+    
+    if [[ ! -d ".git" ]]; then
+        warn "当前不是 Git 仓库，无法自动更新"
+        echo -e "请尝试重新安装或手动下载最新版"
+        pause
+        return
+    fi
+
+    echo -e "${BLUE}拉取最新代码...${RESET}"
+    if git pull; then
+        success "更新完成，正在重启脚本..."
+        sleep 1
+        exec bash "$0"
+    else
+        err "更新失败，请检查网络"
+        pause
+    fi
 }
 
 # ==============================================================================

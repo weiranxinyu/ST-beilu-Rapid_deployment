@@ -19,21 +19,32 @@
 
 ## 🚀 安装说明
 
-### 方法 1: 全新安装
+### 方法 1: 一键安装 (推荐)
 
-在 Termux 中运行以下命令（假设你已经下载了本项目）：
+复制以下命令并在 Termux 中粘贴运行：
 
 ```bash
-# 赋予安装脚本执行权限
-chmod +x install.sh
-
-# 运行安装脚本
-./install.sh
+bash <(curl -sL https://raw.githubusercontent.com/beilusaiying/ST-beilu-Rapid_deployment/main/install.sh)
 ```
 
-### 方法 2: 手动启动
+### 方法 2: 手动安装 (Git Clone)
 
-如果已经安装完成，可以通过以下命令启动管理菜单：
+如果你无法使用一键安装，可以尝试手动克隆仓库：
+
+```bash
+# 克隆仓库
+git clone https://github.com/beilusaiying/ST-beilu-Rapid_deployment ST-Manager
+
+# 进入目录
+cd ST-Manager
+
+# 赋予权限并安装
+chmod +x install.sh && ./install.sh
+```
+
+### 启动管理菜单
+
+安装完成后，可以通过以下命令随时启动管理菜单：
 
 ```bash
 bash ~/ST-Manager/manager/core.sh
