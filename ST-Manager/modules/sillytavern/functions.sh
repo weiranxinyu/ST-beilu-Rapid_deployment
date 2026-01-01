@@ -55,6 +55,14 @@ st_start() {
 
     echo -e "${GREEN}正在启动 SillyTavern...${RESET}"
     echo -e "${YELLOW}提示: 按 Ctrl+C 可停止运行并返回${RESET}"
+    
+    # 尝试打开浏览器
+    if command -v termux-open-url &>/dev/null; then
+        termux-open-url "http://127.0.0.1:8000"
+    elif command -v xdg-open &>/dev/null; then
+        xdg-open "http://127.0.0.1:8000" &>/dev/null
+    fi
+
     cd "$ST_DIR" || return
     # 增加内存限制防止 OOM
     node --max-old-space-size=4096 server.js

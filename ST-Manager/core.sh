@@ -8,7 +8,6 @@
 
 # Environment Setup
 set -o pipefail
-IFS=$'\n\t'
 
 # ==============================================================================
 # Paths & Variables
@@ -111,8 +110,10 @@ load_modules() {
             [[ "$line" =~ ^[[:space:]]*# || -z "$line" ]] && continue
             
             # Group Header: [GroupName]
-            if [[ "$line" =~ ^\[(.*)\]$ ]]; then
+            if [[ "$line" =~ ^\[(.*)\] ]]; then
                 current_group="${BASH_REMATCH[1]}"
+                # Trim CR if present
+                current_group="${current_group%$'\r'}"
                 GROUP_TO_MODULE_MAP["$current_group"]="$module_name"
             
             # Menu Item: key=value
@@ -120,6 +121,10 @@ load_modules() {
                 local key="${BASH_REMATCH[1]}"
                 local text="${BASH_REMATCH[2]}"
                 
+                # Trim whitespace/newlines from key and text
+                key=$(echo "$key" | tr -d '[:space:]')
+                text=$(echo "$text" | tr -d '\r')
+
                 MENU_TEXTS["$key"]="$text"
                 FUNCTION_MAP["$key"]="$key"
                 MODULE_GROUPS["$current_group,$key"]="$text"

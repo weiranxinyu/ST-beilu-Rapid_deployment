@@ -79,6 +79,11 @@ gcli_start() {
     sleep 2
     if is_gcli_running; then
         success "启动成功！日志已输出到 $GCLI_DIR/gcli.log"
+        echo -e "${BLUE}========================================${RESET}"
+        echo -e "API 地址: ${GREEN}http://127.0.0.1:7861/v1${RESET}"
+        echo -e "默认密码: ${GREEN}pwd${RESET}"
+        echo -e "${BLUE}========================================${RESET}"
+        echo -e "请在 SillyTavern 中配置此 API 地址和密码"
     else
         err "启动失败，请查看日志"
         cat gcli.log
