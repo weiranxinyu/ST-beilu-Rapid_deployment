@@ -62,6 +62,16 @@ load_settings() {
         echo "DEBUG_MODE=false" >> "$SETTINGS_FILE"
     fi
     source "$SETTINGS_FILE"
+    
+    # Apply Proxy
+    if [[ "$USE_PROXY" == "true" && -n "$PROXY_URL" ]]; then
+        export http_proxy="$PROXY_URL"
+        export https_proxy="$PROXY_URL"
+        export ALL_PROXY="$PROXY_URL"
+        log "已启用代理: $PROXY_URL"
+    else
+        unset http_proxy https_proxy ALL_PROXY
+    fi
 }
 
 save_settings() {
@@ -197,6 +207,7 @@ settings_menu() {
     while true; do
         clear
         echo -e "${BLUE}=== 系统设置 ===${RESET}"
+        echo -e "说明: 如果下载速度慢或无法连接 GitHub，请开启代理。"
         echo -e "1) 切换代理开关 (当前: $USE_PROXY)"
         echo -e "2) 设置代理地址 (当前: $PROXY_URL)"
         echo -e "0) 返回"
