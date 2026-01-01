@@ -183,12 +183,33 @@ update_self() {
     echo -e "${BLUE}正在检查更新...${RESET}"
     cd "$APP_DIR" || return
     
-    # 简单粗暴的 git pull
+    # 配置 git 代理
+    if [[ "$USE_PROXY" == "true" && -n "$PROXY_URL" ]]; then
+        git config http.proxy "$PROXY_URL"
+        git config https.proxy "$PROXY_URL"
+    else
+        git config --unset http.proxy
+        git config --unset https.proxy
+    fi
+
+    # 尝试更新
     if git pull; then
         success "更新成功！正在重启..."
         exec bash "$0"
     else
-        err "更新失败，请检查网络连接。"
+        echo -e "${RED}更新失败！错误信息如上。${RESET}"
+        echo -e "${YELLOW}常见原因:${RESET}"
+        echo -e "1. 网络问题 (请检查代理设置)"
+        echo -e "2. 本地文件冲突 (您修改了脚本文件)"
+        
+        read -rp "是否尝试强制重置更新? (这将覆盖本地修改) [y/N]: " force
+        if [[ "$force" =~ ^[Yy]$ ]]; then
+            echo -e "${BLUE}正在强制重置...${RESET}"
+            git fetch --all
+            git reset --hard origin/main
+            success "重置成功！正在重启..."
+            exec bash "$0"
+        fi
         pause
     fi
 }
@@ -197,7 +218,10 @@ settings_menu() {
     while true; do
         clear
         echo -e "${BLUE}=== 系统设置 ===${RESET}"
-        echo -e "说明: 如果下载速度慢或无法连接 GitHub，请开启代理。"
+        echo -e "${YELLOW}注意: 如果您在中国大陆使用，更新功能通常需要配置代理。${RESET}"
+        echo -e "请查看您的 VPN 软件设置，找到 'HTTP 代理端口'。"
+        echo -e "常见的本地代理地址: http://127.0.0.1:7890 (Clash) 或 :10809 (v2rayN)"
+        echo -e "${BLUE}----------------------------------------------${RESET}"
         echo -e "1) 切换代理开关 (当前: $USE_PROXY)"
         echo -e "2) 设置代理地址 (当前: $PROXY_URL)"
         echo -e "0) 返回"
@@ -208,7 +232,8 @@ settings_menu() {
                 save_settings
                 ;;
             2)
-                read -rp "请输入代理地址 (例如 http://127.0.0.1:7890): " url
+                echo -e "${YELLOW}请输入完整的代理地址 (包含 http://)${RESET}"
+                read -rp "例如 http://127.0.0.1:7890 : " url
                 PROXY_URL="$url"
                 save_settings
                 ;;
