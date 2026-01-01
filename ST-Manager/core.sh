@@ -3,7 +3,8 @@
 # ==============================================================================
 # Project: ST-Manager
 # Description: Advanced SillyTavern Deployment Tool for Termux
-# Version: v2.0.0
+# Version: v1.0
+# Author: 贝露凛倾
 # ==============================================================================
 
 # Environment Setup
@@ -151,7 +152,7 @@ load_modules() {
 
     # Add System Management Items
     local sys_group="系统管理"
-    local sys_items=("fix_env:修复运行环境" "update_self:更新管理工具" "settings_menu:系统设置")
+    local sys_items=("fix_env:修复运行环境" "update_self:更新管理工具" "settings_menu:系统设置" "visit_github:访问 GitHub (求星星)" "visit_discord:加入 Discord 粉丝群")
     
     for item in "${sys_items[@]}"; do
         local key="${item%:*}"
@@ -160,18 +161,7 @@ load_modules() {
         FUNCTION_MAP["$key"]="$key"
         MODULE_GROUPS["$sys_group,$key"]="$text"
     done
-    MODULE_GROUP_ORDER["$sys_group"]="fix_env update_self settings_menu"
-}
-
-build_menu_order() {
-    MENU_ORDER=()
-    for group in "${MAIN_GROUP_ORDER[@]}"; do
-        if [[ -n "${MODULE_GROUP_ORDER[$group]}" ]]; then
-            for key in ${MODULE_GROUP_ORDER[$group]}; do
-                MENU_ORDER+=("$key")
-            done
-        fi
-    done
+    MODULE_GROUP_ORDER["$sys_group"]="fix_env update_self settings_menu visit_github visit_discord"
 }
 
 # ==============================================================================
@@ -227,43 +217,82 @@ settings_menu() {
     done
 }
 
+visit_github() {
+    local url="https://github.com/beilusaiying/ST-beilu-Rapid_deployment"
+    echo -e "${BLUE}正在打开 GitHub 仓库...${RESET}"
+    echo -e "请给我们点个 Star ⭐️！"
+    if command -v termux-open-url &>/dev/null; then
+        termux-open-url "$url"
+    elif command -v xdg-open &>/dev/null; then
+        xdg-open "$url" &>/dev/null
+    else
+        echo -e "请手动访问: $url"
+    fi
+    pause
+}
+
+visit_discord() {
+    local url="https://discord.gg/agHeDq9bqU"
+    echo -e "${BLUE}正在打开 Discord 粉丝群...${RESET}"
+    if command -v termux-open-url &>/dev/null; then
+        termux-open-url "$url"
+    elif command -v xdg-open &>/dev/null; then
+        xdg-open "$url" &>/dev/null
+    else
+        echo -e "请手动访问: $url"
+    fi
+    pause
+}
+
 # ==============================================================================
 # Main Menu
 # ==============================================================================
-main_menu() {
+show_banner() {
+    clear
+    echo -e "${BLUE}==============================================${RESET}"
+    echo -e "${GREEN}             与你之歌 v1.0             ${RESET}"
+    echo -e "${BLUE}==============================================${RESET}"
+    echo -e "${YELLOW}作者: 贝露凛倾${RESET}"
+    echo -e "${BLUE}----------------------------------------------${RESET}"
+    echo -e "本人做此预设的目的为ai模型微调的学术交流，仅供学习，无其他目的。"
+    echo -e "且为免费开源项目，禁止商用。二改需授权。"
+    echo -e "此脚本禁止用于商业传播，仅限ai模型研究者交流。"
+    echo -e "禁止利用该脚本进行违反当地法律的事情。"
+    echo -e "${BLUE}==============================================${RESET}"
+}
+
+show_group_menu() {
+    local group_name="$1"
     while true; do
         clear
-        echo -e "${BLUE}==============================================${RESET}"
-        echo -e "${GREEN}           ST-Manager v2.0 (Dynamic)          ${RESET}"
-        echo -e "${BLUE}==============================================${RESET}"
-
-        # Status Check
-        echo -e "${YELLOW}[状态监控]${RESET}"
-        if declare -f st_status_text > /dev/null; then st_status_text; fi
-        if declare -f gcli_status_text > /dev/null; then gcli_status_text; fi
+        echo -e "${BLUE}=== $group_name ===${RESET}"
         
+        # Status Check (Context aware)
+        if [[ "$group_name" == "SillyTavern 管理" ]]; then
+            if declare -f st_status_text > /dev/null; then st_status_text; fi
+        elif [[ "$group_name" == "gcli2api 管理" ]]; then
+            if declare -f gcli_status_text > /dev/null; then gcli_status_text; fi
+        fi
+        echo -e "${BLUE}----------------------------------------------${RESET}"
+
         local i=1
         declare -A active_options
-
-        for group in "${MAIN_GROUP_ORDER[@]}"; do
-            # Check if group has items
-            if [[ -n "${MODULE_GROUP_ORDER[$group]}" ]]; then
-                echo -e "\n${BLUE}[$group]${RESET}"
-                for key in ${MODULE_GROUP_ORDER[$group]}; do
-                    echo -e "  ${GREEN}$i)${RESET} ${MENU_TEXTS[$key]}"
-                    active_options[$i]="$key"
-                    ((i++))
-                done
-            fi
-        done
-
-        echo -e "\n${RED}0)${RESET} 退出"
+        
+        if [[ -n "${MODULE_GROUP_ORDER[$group_name]}" ]]; then
+            for key in ${MODULE_GROUP_ORDER[$group_name]}; do
+                echo -e "  ${GREEN}$i)${RESET} ${MENU_TEXTS[$key]}"
+                active_options[$i]="$key"
+                ((i++))
+            done
+        fi
+        
+        echo -e "\n${RED}0)${RESET} 返回上一级"
         echo -e "${BLUE}==============================================${RESET}"
         
         read -rp "请选择 [0-$((i-1))]: " choice
         
         if [[ "$choice" == "0" ]]; then
-            exit 0
+            break
         elif [[ -n "${active_options[$choice]}" ]]; then
             local func="${FUNCTION_MAP[${active_options[$choice]}]}"
             if declare -f "$func" > /dev/null; then
@@ -279,10 +308,44 @@ main_menu() {
     done
 }
 
+main_menu() {
+    while true; do
+        show_banner
+        
+        # Global Status Summary
+        echo -e "${YELLOW}[状态监控]${RESET}"
+        if declare -f st_status_text > /dev/null; then st_status_text; fi
+        if declare -f gcli_status_text > /dev/null; then gcli_status_text; fi
+        echo -e "${BLUE}----------------------------------------------${RESET}"
+
+        local i=1
+        declare -A group_map
+
+        for group in "${MAIN_GROUP_ORDER[@]}"; do
+            echo -e "  ${GREEN}$i)${RESET} $group"
+            group_map[$i]="$group"
+            ((i++))
+        done
+
+        echo -e "\n${RED}0)${RESET} 退出"
+        echo -e "${BLUE}==============================================${RESET}"
+        
+        read -rp "请选择 [0-$((i-1))]: " choice
+        
+        if [[ "$choice" == "0" ]]; then
+            exit 0
+        elif [[ -n "${group_map[$choice]}" ]]; then
+            show_group_menu "${group_map[$choice]}"
+        else
+            err "无效选项"
+            sleep 1
+        fi
+    done
+}
+
 # ==============================================================================
 # Startup
 # ==============================================================================
 load_settings
 load_modules
-build_menu_order
 main_menu
