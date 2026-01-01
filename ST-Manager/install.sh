@@ -10,7 +10,7 @@ IFS=$'\n\t'
 
 # 全局变量
 SCRIPT_NAME="st-manager"
-REPO_URL="https://github.com/beilusaiying/sillytavern-beilu-Rapid_deployment"
+REPO_URL="https://github.com/beilusaiying/ST-beilu-Rapid_deployment"
 APP_DIR="$HOME/ST-Manager"
 MANAGER_DIR="$APP_DIR/manager"
 
@@ -90,6 +90,13 @@ install_project() {
     else
         log "正在克隆仓库..."
         git clone "$REPO_URL" "$APP_DIR" || err "克隆失败，请检查网络"
+        
+        # 智能修正目录结构 (防止 ST-Manager/ST-Manager 嵌套)
+        if [[ -d "$APP_DIR/ST-Manager" ]]; then
+            log "检测到嵌套目录，正在修正结构..."
+            mv "$APP_DIR/ST-Manager/"* "$APP_DIR/"
+            rmdir "$APP_DIR/ST-Manager"
+        fi
     fi
 }
 

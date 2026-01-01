@@ -24,7 +24,7 @@
 复制以下命令并在 Termux 中粘贴运行：
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/beilusaiying/ST-beilu-Rapid_deployment/main/install.sh)
+apt update && apt install curl git nodejs jq expect python openssl-tool -y && curl -L -o install.sh https://raw.githubusercontent.com/beilusaiying/ST-beilu-Rapid_deployment/main/ST-Manager/install.sh && chmod +x install.sh && ./install.sh
 ```
 
 ### 方法 2: 手动安装 (Git Clone)
