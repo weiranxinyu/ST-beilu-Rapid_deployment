@@ -43,12 +43,22 @@ warn() {
 check_deps() {
     log "检查系统依赖..."
     
-    # Termux 基础依赖
-    local deps=(curl unzip git nodejs jq expect python openssl-tool build-essential)
+    # Termux 基础依赖 (使用 nodejs-lts 替代 nodejs 以提高稳定性)
+    local deps=(curl unzip git jq expect python openssl-tool build-essential)
     local missing=()
 
+    # 特殊检查 node
+    if ! command -v node &>/dev/null; then
+        missing+=("nodejs-lts")
+    fi
+
     for dep in "${deps[@]}"; do
-        if ! command -v "$dep" &>/dev/null; then
+        # 处理包名与命令名不一致的情况
+        local cmd="$dep"
+        [[ "$dep" == "openssl-tool" ]] && cmd="openssl"
+        [[ "$dep" == "build-essential" ]] && cmd="gcc" # 简单检查 gcc 是否存在
+
+        if ! command -v "$cmd" &>/dev/null; then
             missing+=("$dep")
         fi
     done
@@ -58,7 +68,18 @@ check_deps() {
         log "正在自动安装依赖..."
         
         if [[ "$PREFIX" == *"/com.termux"* ]]; then
-            log "正在更新软件源..."
+            log "正在更新软件源并升级系统..."
+            
+            # 1. 尝试修复潜在的损坏状态
+            dpkg --configure -a || true
+            
+            # 2. 移除可能导致 ABI 冲突的 bleeding-edge nodejs
+            if pkg list-installed 2>/dev/null | grep -q "^nodejs/"; then
+                warn "检测到非 LTS 版本 Node.js，正在移除以避免库兼容性问题..."
+                pkg uninstall -y nodejs || dpkg --remove --force-all nodejs
+            fi
+
+            # 3. 全面升级系统 (解决 CANNOT LINK EXECUTABLE 问题)
             pkg update -y
             pkg upgrade -y
             
@@ -66,7 +87,7 @@ check_deps() {
             if ! pkg install -y "${missing[@]}"; then
                 warn "依赖安装遇到问题，尝试自动修复..."
                 
-                # 尝试修复 dpkg 中断问题
+                # 再次尝试修复
                 if dpkg --configure -a; then
                     log "dpkg 修复成功，重试安装..."
                     pkg install -y "${missing[@]}" || err "依赖安装再次失败。请尝试手动运行: dpkg --configure -a"

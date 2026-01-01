@@ -31,7 +31,8 @@ st_status_text() {
 # 安装
 st_install() {
     echo -e "${BLUE}开始安装 SillyTavern (Release分支)...${RESET}"
-    git clone --branch release https://github.com/SillyTavern/SillyTavern "$ST_DIR"
+    # 使用 --depth 1 减少下载体积
+    git clone --depth 1 --branch release https://github.com/SillyTavern/SillyTavern "$ST_DIR"
     cd "$ST_DIR" || return
     echo -e "${BLUE}安装 npm 依赖...${RESET}"
     npm install
@@ -55,7 +56,8 @@ st_start() {
     echo -e "${GREEN}正在启动 SillyTavern...${RESET}"
     echo -e "${YELLOW}提示: 按 Ctrl+C 可停止运行并返回${RESET}"
     cd "$ST_DIR" || return
-    node server.js
+    # 增加内存限制防止 OOM
+    node --max-old-space-size=4096 server.js
     pause
 }
 
