@@ -58,8 +58,22 @@ check_deps() {
         log "正在自动安装依赖..."
         
         if [[ "$PREFIX" == *"/com.termux"* ]]; then
+            log "正在更新软件源..."
             pkg update -y
-            pkg install -y "${missing[@]}" || err "依赖安装失败，请检查网络或更换源"
+            pkg upgrade -y
+            
+            log "正在安装依赖: ${missing[*]}"
+            if ! pkg install -y "${missing[@]}"; then
+                warn "依赖安装遇到问题，尝试自动修复..."
+                
+                # 尝试修复 dpkg 中断问题
+                if dpkg --configure -a; then
+                    log "dpkg 修复成功，重试安装..."
+                    pkg install -y "${missing[@]}" || err "依赖安装再次失败。请尝试手动运行: dpkg --configure -a"
+                else
+                    err "无法自动修复 dpkg 错误。请尝试手动运行: dpkg --configure -a"
+                fi
+            fi
         else
             # 非 Termux 环境尝试使用 apt (仅供测试)
             if command -v apt &>/dev/null; then
