@@ -47,7 +47,7 @@ warn() { echo -e "${YELLOW}[WARN] $1${RESET}"; }
 err() { echo -e "${RED}[ERROR] $1${RESET}" >&2; }
 
 pause() {
-    read -rsp $'Press any key to continue...\n' -n 1
+    read -rsp $'按任意键继续...\n' -n 1
 }
 
 # ==============================================================================
@@ -168,25 +168,27 @@ build_menu_order() {
 # System Functions
 # ==============================================================================
 fix_env() {
-    echo -e "${YELLOW}Reinstalling dependencies...${RESET}"
+    echo -e "${YELLOW}正在重新安装依赖...${RESET}"
     if [[ "$PREFIX" == *"/com.termux"* ]]; then
         pkg update -y
         pkg install -y curl unzip git nodejs-lts jq expect python openssl-tool
     else
-        warn "Not Termux, skipping pkg install."
+        warn "非 Termux 环境，跳过 pkg 安装。"
     fi
-    success "Dependencies fixed."
+    success "依赖修复完成。"
     pause
 }
 
 update_self() {
-    echo -e "${BLUE}Checking for updates...${RESET}"
+    echo -e "${BLUE}正在检查更新...${RESET}"
     cd "$APP_DIR" || return
+    
+    # 简单粗暴的 git pull
     if git pull; then
-        success "Updated successfully. Restarting..."
+        success "更新成功！正在重启..."
         exec bash "$0"
     else
-        err "Update failed."
+        err "更新失败，请检查网络连接。"
         pause
     fi
 }
@@ -194,18 +196,18 @@ update_self() {
 settings_menu() {
     while true; do
         clear
-        echo -e "${BLUE}=== System Settings ===${RESET}"
-        echo -e "1) Toggle Proxy (Current: $USE_PROXY)"
-        echo -e "2) Set Proxy URL (Current: $PROXY_URL)"
-        echo -e "0) Back"
-        read -rp "Choice: " choice
+        echo -e "${BLUE}=== 系统设置 ===${RESET}"
+        echo -e "1) 切换代理开关 (当前: $USE_PROXY)"
+        echo -e "2) 设置代理地址 (当前: $PROXY_URL)"
+        echo -e "0) 返回"
+        read -rp "请选择: " choice
         case "$choice" in
-            1) 
+            1)
                 if [[ "$USE_PROXY" == "true" ]]; then USE_PROXY="false"; else USE_PROXY="true"; fi
                 save_settings
                 ;;
             2)
-                read -rp "Enter Proxy URL (e.g., http://127.0.0.1:7890): " url
+                read -rp "请输入代理地址 (例如 http://127.0.0.1:7890): " url
                 PROXY_URL="$url"
                 save_settings
                 ;;
@@ -225,7 +227,7 @@ main_menu() {
         echo -e "${BLUE}==============================================${RESET}"
 
         # Status Check
-        echo -e "${YELLOW}[Status Monitor]${RESET}"
+        echo -e "${YELLOW}[状态监控]${RESET}"
         if declare -f st_status_text > /dev/null; then st_status_text; fi
         if declare -f gcli_status_text > /dev/null; then gcli_status_text; fi
         
@@ -244,10 +246,10 @@ main_menu() {
             fi
         done
 
-        echo -e "\n${RED}0)${RESET} Exit"
+        echo -e "\n${RED}0)${RESET} 退出"
         echo -e "${BLUE}==============================================${RESET}"
         
-        read -rp "Select option [0-$((i-1))]: " choice
+        read -rp "请选择 [0-$((i-1))]: " choice
         
         if [[ "$choice" == "0" ]]; then
             exit 0
@@ -256,11 +258,11 @@ main_menu() {
             if declare -f "$func" > /dev/null; then
                 "$func"
             else
-                err "Function '$func' not found!"
+                err "未找到功能 '$func'!"
                 pause
             fi
         else
-            err "Invalid option"
+            err "无效选项"
             sleep 1
         fi
     done
