@@ -72,9 +72,9 @@ install_project() {
     fi
     
     # Backup user config if exists
-    if [[ -f "$INSTALL_DIR/manager/conf/settings.conf" ]]; then
+    if [[ -f "$INSTALL_DIR/conf/settings.conf" ]]; then
         log "Backing up settings..."
-        cp "$INSTALL_DIR/manager/conf/settings.conf" "$TEMP_DIR/settings.conf.bak"
+        cp "$INSTALL_DIR/conf/settings.conf" "$TEMP_DIR/settings.conf.bak"
     fi
     
     # Clean install
@@ -90,20 +90,20 @@ install_project() {
     # Restore config
     if [[ -f "$TEMP_DIR/settings.conf.bak" ]]; then
         log "Restoring settings..."
-        mkdir -p "$INSTALL_DIR/manager/conf"
-        cp "$TEMP_DIR/settings.conf.bak" "$INSTALL_DIR/manager/conf/settings.conf"
+        mkdir -p "$INSTALL_DIR/conf"
+        cp "$TEMP_DIR/settings.conf.bak" "$INSTALL_DIR/conf/settings.conf"
     fi
     
     # Permissions
-    chmod +x "$INSTALL_DIR/manager/core.sh"
-    find "$INSTALL_DIR/manager/modules" -name "*.sh" -exec chmod +x {} \;
+    chmod +x "$INSTALL_DIR/core.sh"
+    find "$INSTALL_DIR/modules" -name "*.sh" -exec chmod +x {} \;
 }
 
 setup_autostart() {
     read -rp "Enable autostart on Termux launch? (y/n): " choice
     if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
         local bashrc="$HOME/.bashrc"
-        local cmd="bash $INSTALL_DIR/manager/core.sh"
+        local cmd="bash $INSTALL_DIR/core.sh"
         if ! grep -q "$cmd" "$bashrc"; then
             echo "$cmd" >> "$bashrc"
             success "Autostart enabled"
@@ -119,13 +119,13 @@ main() {
     
     echo -e "${BLUE}============================${RESET}"
     success "Installation Complete!"
-    echo -e "Run: ${YELLOW}bash $INSTALL_DIR/manager/core.sh${RESET}"
+    echo -e "Run: ${YELLOW}bash $INSTALL_DIR/core.sh${RESET}"
     
     setup_autostart
     
     read -rp "Start now? (y/n): " start
     if [[ "$start" == "y" || "$start" == "Y" ]]; then
-        exec bash "$INSTALL_DIR/manager/core.sh"
+        exec bash "$INSTALL_DIR/core.sh"
     fi
 }
 
