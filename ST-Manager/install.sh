@@ -2,7 +2,7 @@
 
 # Project: ST-Manager
 # Description: SillyTavern Deployment Tool for Termux
-# Repo: https://github.com/beilusaiying/ST-beilu-Rapid_deployment
+# Repo: https://github.com/weiranxinyu/ST-beilu-Rapid_deployment
 
 set -euo pipefail
 IFS=$'\n\t'
