@@ -8,7 +8,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Config
-REPO_URL="https://github.com/beilusaiying/ST-beilu-Rapid_deployment"
+REPO_URL="https://github.com/weiranxinyu/ST-beilu-Rapid_deployment"
 INSTALL_DIR="$HOME/ST-Manager"
 TEMP_DIR="$(mktemp -d)"
 
