@@ -217,7 +217,13 @@ st_switch_branch() {
 
 # 备份
 st_backup_menu() {
-    local backup_file="$HOME/st_backup_$(date +%Y%m%d_%H%M%S).zip"
+    # 设置新的备份目录
+local BACKUP_DIR="/storage/emulated/0/ST"
+local backup_file="$BACKUP_DIR/st_backup_$(date +%Y%m%d_%H%M%S).zip"
+
+# 创建备份目录
+mkdir -p "$BACKUP_DIR"
+
     echo -e "${BLUE}正在备份数据到 $backup_file ...${RESET}"
     if [[ -d "$ST_DIR" ]]; then
         cd "$ST_DIR" || return
@@ -235,4 +241,34 @@ st_backup_menu() {
         err "目录不存在"
     fi
     pause
+}
+# 恢复功能
+st_restore_menu() {
+    local BACKUP_DIR="/storage/emulated/0/ST"
+    
+    echo -e "${BLUE}=== SillyTavern 数据恢复 ===${RESET}"
+    
+    # 查找备份文件
+    local found_backups=()
+    for f in "$BACKUP_DIR"/st_backup_*.zip "$HOME"/st_backup_*.zip; do
+        [[ -f "$f" ]] && found_backups+=("$f")
+    done
+    
+    if [[ ${#found_backups[@]} -eq 0 ]]; then
+        err "没有找到备份文件"
+        pause
+        return
+    fi
+    
+    # 显示备份列表
+    echo -e "${YELLOW}可用的备份文件:${RESET}"
+    local i=1
+    for backup in "${found_backups[@]}"; do
+        echo -e " ${GREEN}$i)${RESET} $(basename "$backup")"
+        ((i++))
+    done
+    echo -e " ${RED}0)${RESET} 返回"
+    
+    read -rp "请选择: " choice
+    # ... 恢复逻辑
 }
