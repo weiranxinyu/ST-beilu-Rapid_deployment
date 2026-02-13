@@ -5,7 +5,7 @@
 
 ## 📖 项目简介
 
-本项目是一个专为 Android Termux 环境设计的 **SillyTavern (酒馆)** 和 **gcli2api (逆向 API)** 一键部署与管理工具。
+本项目是一个专为 Android Termux 环境设计的 **SillyTavern (酒馆)** 和 **gcli2api (逆向 API)** 一键部署与管理工具。基于原作者修改了备份路径地址，把恢复功能单独出来了
 
 **主要目的**:
 
@@ -25,7 +25,7 @@
 在 Termux 中复制并运行以下命令即可一键安装：
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/beilusaiying/ST-beilu-Rapid_deployment/main/ST-Manager/install.sh)
+bash <(curl -sL https://raw.githubusercontent.com/weiranxinyu/ST-beilu-Rapid_deployment/main/ST-Manager/install.sh)
 ```
 
 安装完成后，输入以下命令启动管理菜单：
