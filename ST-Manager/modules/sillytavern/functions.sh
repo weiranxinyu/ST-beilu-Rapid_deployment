@@ -242,33 +242,134 @@ mkdir -p "$BACKUP_DIR"
     fi
     pause
 }
-# 恢复功能
+# 恢复功能（修复版）
 st_restore_menu() {
     local BACKUP_DIR="/storage/emulated/0/ST"
+    local ST_DIR="$HOME/SillyTavern"
     
     echo -e "${BLUE}=== SillyTavern 数据恢复 ===${RESET}"
     
     # 查找备份文件
     local found_backups=()
-    for f in "$BACKUP_DIR"/st_backup_*.zip "$HOME"/st_backup_*.zip; do
+    for f in "$BACKUP_DIR"/st_backup_*.zip; do
+        [[ -f "$f" ]] && found_backups+=("$f")
+    done
+    
+    # 兼容旧位置
+    for f in "$HOME"/st_backup_*.zip; do
         [[ -f "$f" ]] && found_backups+=("$f")
     done
     
     if [[ ${#found_backups[@]} -eq 0 ]]; then
         err "没有找到备份文件"
+        echo -e "${YELLOW}备份文件通常位于: /storage/emulated/0/ST/${RESET}"
         pause
         return
     fi
     
-    # 显示备份列表
+    # 去重并显示
     echo -e "${YELLOW}可用的备份文件:${RESET}"
+    local unique_backups=()
+    local seen=()
     local i=1
-    for backup in "${found_backups[@]}"; do
-        echo -e " ${GREEN}$i)${RESET} $(basename "$backup")"
-        ((i++))
-    done
-    echo -e " ${RED}0)${RESET} 返回"
     
-    read -rp "请选择: " choice
-    # ... 恢复逻辑
+    for backup in "${found_backups[@]}"; do
+        local basename=$(basename "$backup")
+        if [[ ! " ${seen[@]} " =~ " ${basename} " ]]; then
+            seen+=("$basename")
+            unique_backups+=("$backup")
+            local size=$(du -h "$backup" 2>/dev/null | cut -f1)
+            echo -e " ${GREEN}$i)${RESET} $basename ($size)"
+            ((i++))
+        fi
+    done
+    
+    echo -e " ${RED}0)${RESET} 返回"
+    echo ""
+    
+    read -rp "请选择要恢复的备份 [0-$((i-1))]: " choice
+    
+    if [[ "$choice" == "0" ]]; then
+        return
+    fi
+    
+    if [[ "$choice" -ge 1 && "$choice" -lt "$i" ]]; then
+        local selected_backup="${unique_backups[$((choice-1))]}"
+        local basename=$(basename "$selected_backup")
+        
+        echo ""
+        echo -e "${YELLOW}将要恢复: $basename${RESET}"
+        echo -e "${RED}警告: 这将覆盖当前的 data 目录！${RESET}"
+        echo ""
+        
+        read -rp "确认恢复? (y/N): " confirm
+        
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            cd "$ST_DIR" || {
+                err "无法进入 $ST_DIR"
+                pause
+                return
+            }
+            
+            # 停止 SillyTavern
+            echo -e "${BLUE}正在停止 SillyTavern...${RESET}"
+            if command -v pm2 &>/dev/null && pm2 list | grep -q "SillyTavern"; then
+                pm2 stop SillyTavern
+            elif pgrep -f "server.js" > /dev/null; then
+                pkill -f "node server.js"
+            fi
+            sleep 2
+            
+            # 强制停止
+            if pgrep -f "server.js" > /dev/null; then
+                pkill -9 -f "node server.js"
+                sleep 1
+            fi
+            
+            # 备份当前数据
+            local current_backup="data.backup.$(date +%Y%m%d_%H%M%S)"
+            if [[ -d "data" ]]; then
+                echo -e "${BLUE}正在备份当前数据到: $current_backup${RESET}"
+                mv data "$current_backup"
+            fi
+            
+            # 解压恢复（关键：指定解压目录）
+            echo -e "${BLUE}正在解压恢复...${RESET}"
+            if unzip -o "$selected_backup" -d "$ST_DIR/"; then
+                success "解压成功"
+                
+                # 验证恢复结果
+                if [[ -d "data" ]]; then
+                    success "数据目录已恢复"
+                    echo -e "${YELLOW}恢复的文件:${RESET}"
+                    ls -la data/ | head -10
+                    
+                    # 检查关键文件
+                    if [[ -f "data/default-user/settings.json" ]]; then
+                        success "验证通过: 设置文件存在"
+                    fi
+                    
+                    success "恢复完成！请重新启动 SillyTavern"
+                else
+                    err "错误: 解压后未找到 data 目录"
+                    # 恢复原数据
+                    if [[ -d "$current_backup" ]]; then
+                        mv "$current_backup" data
+                        echo -e "${BLUE}已恢复原数据${RESET}"
+                    fi
+                fi
+            else
+                err "解压失败"
+                # 恢复原数据
+                if [[ -d "$current_backup" ]]; then
+                    mv "$current_backup" data
+                    echo -e "${BLUE}已恢复原数据${RESET}"
+                fi
+            fi
+        fi
+    else
+        err "无效选择"
+    fi
+    
+    pause
 }
