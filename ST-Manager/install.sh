@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Project: ST-Manager
-# Description: SillyTavern Deployment Tool for Termux with Version Selection
+# Description: SillyTavern Deployment Tool for Termux
 # Repo: https://github.com/weiranxinyu/ST-beilu-Rapid_deployment
 
 set -euo pipefail
@@ -10,13 +10,13 @@ IFS=$'\n\t'
 # =========================================================================
 # 配置
 # =========================================================================
-REPO_URL="https://github.com/SillyTavern/SillyTavern"
+REPO_URL="https://github.com/weiranxinyu/ST-beilu-Rapid_deployment"
 INSTALL_DIR="$HOME/ST-Manager"
 TEMP_DIR="$(mktemp -d)"
-TOTAL_STEPS=6
+TOTAL_STEPS=5
 
 # =========================================================================
-# 彩色输出定义
+# 彩色输出定义（从第一个脚本引入）
 # =========================================================================
 RED='\033[1;31m'
 GREEN='\033[1;32m'
@@ -28,7 +28,7 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 # =========================================================================
-# 步骤显示函数
+# 步骤显示函数（从第一个脚本引入）
 # =========================================================================
 current_step=0
 
@@ -62,6 +62,10 @@ err() {
     exit 1
 }
 
+log() { 
+    echo -e "${BLUE}${BOLD}>> [INFO] $1${RESET}" 
+}
+
 # =========================================================================
 # 清理函数
 # =========================================================================
@@ -71,16 +75,20 @@ cleanup() {
 trap cleanup EXIT
 
 # =========================================================================
-# 步骤 1/6：环境检测与依赖检查
+# 步骤 1/5：环境检测与依赖检查
 # =========================================================================
-check_environment() {
+check_deps() {
     show_step "环境检测与依赖检查"
     
+    log "检查环境中..."
+    
+    # Termux 环境检测
     if [ -z "$PREFIX" ] || [[ "$PREFIX" != *"/com.termux"* ]]; then
         warn "检测到非 Termux 环境，部分功能可能受限"
     else
         info "Termux 环境检测通过"
         
+        # 存储权限检测
         local storage_dir="$HOME/storage/shared"
         if [ ! -d "$storage_dir" ]; then
             warn "未检测到存储权限，尝试自动获取..."
@@ -97,16 +105,20 @@ check_environment() {
                 else
                     warn "存储权限获取超时，部分功能可能受限"
                 fi
+            else
+                warn "termux-setup-storage 命令不存在"
             fi
         else
             info "存储权限已配置"
         fi
     fi
     
+    # 依赖检查
     info "检查依赖项..."
     local deps=(curl unzip git jq expect python openssl-tool)
     local missing=()
     
+    # 检查 nodejs
     if ! command -v node &>/dev/null; then 
         missing+=("nodejs")
     else
@@ -137,21 +149,21 @@ check_environment() {
             fi
         fi
         success "依赖安装完成"
+    else
+        info "所有依赖已就绪"
     fi
     
     step_done "环境检测与依赖检查通过"
 }
 
 # =========================================================================
-# 步骤 2/6：下载 ST-Manager 项目资源
+# 步骤 2/5：下载项目资源
 # =========================================================================
-download_manager_resources() {
-    show_step "下载 ST-Manager 项目资源"
+install_project() {
+    show_step "下载项目资源"
     
-    local manager_repo="https://github.com/weiranxinyu/ST-beilu-Rapid_deployment"
-    
-    info "正在从 GitHub 克隆 ST-Manager 仓库..."
-    if ! git clone --depth 1 "$manager_repo" "$TEMP_DIR/repo"; then
+    log "正在从 GitHub 克隆仓库..."
+    if ! git clone --depth 1 "$REPO_URL" "$TEMP_DIR/repo"; then
         err "Git 克隆失败，请检查网络连接"
     fi
     success "仓库克隆成功"
@@ -168,32 +180,36 @@ download_manager_resources() {
         err "核心文件 core.sh 不存在"
     fi
     
-    step_done "ST-Manager 资源已下载"
+    step_done "项目资源已下载"
 }
 
 # =========================================================================
-# 步骤 3/6：安装 ST-Manager
+# 步骤 3/5：安装与配置
 # =========================================================================
-install_manager() {
-    show_step "安装 ST-Manager"
+setup_project() {
+    show_step "安装与配置"
     
+    # 备份现有配置
     if [ -f "$INSTALL_DIR/conf/settings.conf" ]; then
         info "检测到现有配置，正在备份..."
         cp "$INSTALL_DIR/conf/settings.conf" "$TEMP_DIR/settings.conf.bak"
         success "配置已备份"
     fi
     
+    # 清理旧版本
     if [ -d "$INSTALL_DIR" ]; then
         info "正在移除旧版本..."
         rm -rf "$INSTALL_DIR"
         success "旧版本已清理"
     fi
     
+    # 安装文件
     info "正在安装文件到 $INSTALL_DIR..."
     mkdir -p "$INSTALL_DIR"
     cp -rf "$TEMP_DIR/repo/ST-Manager/." "$INSTALL_DIR/"
     success "文件安装完成"
     
+    # 恢复配置
     if [ -f "$TEMP_DIR/settings.conf.bak" ]; then
         info "正在恢复用户配置..."
         mkdir -p "$INSTALL_DIR/conf"
@@ -201,154 +217,22 @@ install_manager() {
         success "配置已恢复"
     fi
     
+    # 设置权限
     info "设置执行权限..."
     chmod +x "$INSTALL_DIR/core.sh"
     find "$INSTALL_DIR/modules" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
     success "权限设置完成"
     
-    step_done "ST-Manager 安装结束"
+    step_done "安装与配置结束"
 }
 
 # =========================================================================
-# 步骤 4/6：版本选择（核心新增功能）
-# =========================================================================
-select_sillytavern_version() {
-    show_step "选择 SillyTavern 版本"
-    
-    local st_dir="$HOME/SillyTavern"
-    
-    if [ -d "$st_dir/.git" ]; then
-        warn "检测到已存在 SillyTavern 目录"
-        echo -ne "${CYAN}${BOLD}>> 是否重新安装/切换版本? (y/n): ${RESET}"
-        read -n1 confirm; echo
-        if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-            step_skip "用户选择保留现有版本"
-            return
-        fi
-        rm -rf "$st_dir"
-    fi
-    
-    info "正在获取 SillyTavern 版本列表..."
-    mkdir -p "$st_dir"
-    if ! git clone --depth 1 --no-single-branch "$REPO_URL" "$st_dir" 2>/dev/null; then
-        err "SillyTavern 仓库克隆失败"
-    fi
-    
-    cd "$st_dir" || err "进入目录失败"
-    
-    info "正在获取版本标签..."
-    git fetch --tags 2>/dev/null || warn "无法获取远程标签，使用本地标签"
-    
-    echo -e "\n${CYAN}${BOLD}==== 可用版本 ====${RESET}"
-    echo -e "${YELLOW}${BOLD}0. release 分支（最新开发版）${RESET}"
-    
-    local tags=()
-    local tag_count=0
-    while IFS= read -r tag; do
-        if [ -n "$tag" ]; then
-            tag_count=$((tag_count + 1))
-            tags+=("$tag")
-            local tag_date=$(git log -1 --format=%ai "$tag" 2>/dev/null | cut -d' ' -f1 || echo "未知日期")
-            echo -e "${GREEN}${BOLD}${tag_count}. ${tag} (${tag_date})${RESET}"
-        fi
-    done < <(git tag --sort=-creatordate | head -20)
-    
-    echo -e "${CYAN}${BOLD}===================${RESET}"
-    
-    local choice
-    while true; do
-        echo -ne "${CYAN}${BOLD}>> 请输入版本序号 (0-${tag_count}): ${RESET}"
-        read -r choice
-        
-        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 0 ] && [ "$choice" -le "$tag_count" ]; then
-            break
-        else
-            warn "无效输入，请重新输入"
-        fi
-    done
-    
-    if [ "$choice" -eq 0 ]; then
-        info "选择安装 release 分支..."
-        git checkout -f origin/release 2>/dev/null || git checkout -f release 2>/dev/null || git checkout -f HEAD
-        success "已切换到 release 分支"
-    else
-        local selected_tag="${tags[$((choice-1))]}"
-        info "选择安装版本: ${selected_tag}"
-        if ! git checkout -f "tags/${selected_tag}" 2>/dev/null; then
-            err "切换到版本 ${selected_tag} 失败"
-        fi
-        success "已切换到版本 ${selected_tag}"
-    fi
-    
-    rm -rf .git
-    step_done "版本选择结束"
-}
-
-# =========================================================================
-# 步骤 5/6：安装 SillyTavern 依赖
-# =========================================================================
-install_sillytavern_deps() {
-    show_step "安装 SillyTavern 依赖"
-    
-    local st_dir="$HOME/SillyTavern"
-    
-    if [ ! -d "$st_dir" ]; then
-        step_skip "SillyTavern 目录不存在"
-        return
-    fi
-    
-    cd "$st_dir" || err "进入 SillyTavern 目录失败"
-    
-    if [ -d "node_modules" ]; then
-        info "清理旧依赖..."
-        rm -rf node_modules
-    fi
-    
-    if [ -d "$HOME/.npm/_cacache" ]; then
-        npm cache clean --force 2>/dev/null || true
-    fi
-    
-    export NODE_ENV=production
-    local retry_count=0
-    local max_retries=3
-    local install_success=0
-    
-    while [ $retry_count -lt $max_retries ]; do
-        if [ $retry_count -eq 0 ]; then
-            info "正在安装 SillyTavern 依赖，请耐心等待..."
-        else
-            warn "重试安装依赖（第 ${retry_count} 次）..."
-        fi
-        
-        if npm install --no-audit --no-fund --loglevel=error --omit=dev; then
-            install_success=1
-            break
-        else
-            retry_count=$((retry_count + 1))
-            if [ $retry_count -lt $max_retries ]; then
-                warn "依赖安装失败，正在清理缓存并准备重试..."
-                rm -rf node_modules 2>/dev/null || true
-                npm cache clean --force 2>/dev/null || true
-                sleep 3
-            fi
-        fi
-    done
-    
-    if [ $install_success -eq 1 ]; then
-        success "SillyTavern 依赖安装完成"
-    else
-        err "依赖安装失败，已重试 ${max_retries} 次，请检查网络连接"
-    fi
-    
-    step_done "依赖安装结束"
-}
-
-# =========================================================================
-# 步骤 6/6：创建系统命令与自动启动配置
+# 步骤 4/5：创建系统命令与自动启动
 # =========================================================================
 setup_commands() {
     show_step "创建系统命令与自动启动配置"
     
+    # 创建全局命令
     if [ -d "$PREFIX/bin" ]; then
         info "创建全局命令 'st-menu'..."
         cat > "$PREFIX/bin/st-menu" << 'EOF'
@@ -357,8 +241,11 @@ bash $HOME/ST-Manager/core.sh
 EOF
         chmod +x "$PREFIX/bin/st-menu"
         success "全局命令 'st-menu' 已创建"
+    else
+        warn "未检测到 $PREFIX/bin 目录，跳过全局命令创建"
     fi
     
+    # 自动启动配置（交互式）
     echo -e "\n${CYAN}${BOLD}>> 是否配置 Termux 启动时自动运行 ST-Manager？${RESET}"
     read -rp "启用自动启动? (y/n): " choice
     if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
@@ -379,18 +266,20 @@ EOF
 }
 
 # =========================================================================
-# 安装完成总结
+# 步骤 5/5：安装完成
 # =========================================================================
 finish_installation() {
+    show_step "安装完成"
+    
     echo -e "\n${GREEN}${BOLD}========================================${RESET}"
-    success "ST-Manager 与 SillyTavern 安装成功！"
-    echo -e "${CYAN}${BOLD}>> ST-Manager 路径：${RESET}$INSTALL_DIR"
-    echo -e "${CYAN}${BOLD}>> SillyTavern 路径：${RESET}$HOME/SillyTavern"
+    success "ST-Manager 安装成功！"
+    echo -e "${CYAN}${BOLD}>> 安装路径：${RESET}$INSTALL_DIR"
     echo -e "${CYAN}${BOLD}>> 启动方式：${RESET}"
     echo -e "   • 全局命令：${YELLOW}st-menu${RESET}"
     echo -e "   • 完整路径：${YELLOW}bash $INSTALL_DIR/core.sh${RESET}"
     echo -e "${GREEN}${BOLD}========================================${RESET}"
     
+    # 询问是否立即启动
     echo -e "\n${CYAN}${BOLD}>> 是否立即启动 ST-Manager？${RESET}"
     read -rp "立即启动? (y/n): " start
     if [[ "$start" == "y" || "$start" == "Y" ]]; then
@@ -401,6 +290,8 @@ finish_installation() {
     else
         info "安装完成，您可以随时使用 'st-menu' 命令启动"
     fi
+    
+    step_done "安装流程全部结束"
 }
 
 # =========================================================================
@@ -412,15 +303,12 @@ main() {
     echo "╔════════════════════════════════════════╗"
     echo "║         ST-Manager 安装程序            ║"
     echo "║    SillyTavern Termux 快速部署工具      ║"
-    echo "║         支持版本选择功能               ║"
     echo "╚════════════════════════════════════════╝"
     echo -e "${RESET}"
     
-    check_environment
-    download_manager_resources
-    install_manager
-    select_sillytavern_version
-    install_sillytavern_deps
+    check_deps
+    install_project
+    setup_project
     setup_commands
     finish_installation
 }
