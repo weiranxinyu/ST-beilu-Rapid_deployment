@@ -251,7 +251,7 @@ load_modules() {
         done < "$menu_file"
     done
 
-    # Add System Management Items
+    # Add System Management Items（修改：添加版本切换和日志功能）
     local sys_group="系统管理"
     local sys_items=("fix_env:修复运行环境" "update_self:更新管理工具" "settings_menu:系统设置" "version_switch:酒馆版本切换" "view_logs:查看操作日志" "clear_logs:清理日志文件" "visit_github:访问 GitHub (求星星)" "visit_discord:加入 Discord 粉丝群")
 
@@ -483,6 +483,7 @@ switch_tavern_version() {
     local choice
     while true; do
         echo -ne "${CYAN}${BOLD}>> 请输入序号 (0-${idx}): ${RESET}"
+       RESET}"
         read -r choice
         [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 0 ] && [ "$choice" -le "$idx" ] && break
         echo -e "${RED}${BOLD}>> 无效输入${RESET}"
