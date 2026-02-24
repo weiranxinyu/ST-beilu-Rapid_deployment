@@ -20,6 +20,10 @@ CONF_DIR="$DIR/conf"
 MODULES_DIR="$DIR/modules"
 SETTINGS_FILE="$CONF_DIR/settings.conf"
 
+# 日志路径（修改：和备份文件夹一样，在共享存储中）
+LOG_DIR="/storage/emulated/0/SillyTavern/ST-Manager-Logs"
+LOG_FILE="$LOG_DIR/st-manager.log"
+
 # Colors
 RED='\033[31m'
 GREEN='\033[32m'
@@ -31,15 +35,45 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 # ==============================================================================
-# 日志系统（新增）
+# 日志系统（修改：使用共享存储路径）
 # ==============================================================================
-LOG_DIR="$APP_DIR/logs"
-LOG_FILE="$LOG_DIR/st-manager.log"
 
-# 初始化日志
+# 检查并获取存储权限
+check_storage_permission() {
+    local storage_dir="/storage/emulated/0"
+    if [ ! -d "$storage_dir" ]; then
+        warn "未检测到存储权限，尝试获取..."
+        if command -v termux-setup-storage >/dev/null 2>&1; then
+            termux-setup-storage
+            sleep 2
+        fi
+    fi
+}
+
+# 初始化日志（修改：创建共享存储中的日志目录）
 init_log() {
+    check_storage_permission
+    
+    # 创建 SillyTavern 主目录（如果不存在）
+    local st_dir="/storage/emulated/0/SillyTavern"
+    if [[ ! -d "$st_dir" ]]; then
+        mkdir -p "$st_dir" 2>/dev/null || {
+            # 如果无法创建，回退到应用目录
+            LOG_DIR="$APP_DIR/logs"
+            LOG_FILE="$LOG_DIR/st-manager.log"
+            mkdir -p "$LOG_DIR"
+            return
+        }
+    fi
+    
+    # 创建日志目录
     if [[ ! -d "$LOG_DIR" ]]; then
-        mkdir -p "$LOG_DIR"
+        mkdir -p "$LOG_DIR" 2>/dev/null || {
+            # 如果无法创建，回退到应用目录
+            LOG_DIR="$APP_DIR/logs"
+            LOG_FILE="$LOG_DIR/st-manager.log"
+            mkdir -p "$LOG_DIR"
+        }
     fi
 }
 
@@ -48,7 +82,7 @@ write_log() {
     local level="$1"
     local message="$2"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+    echo "[$timestamp] [$level] $message" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 # 记录操作开始
@@ -69,13 +103,17 @@ log_end() {
     write_log "INFO" "========================================"
 }
 
-# 查看日志（新增功能）
+# 查看日志（修改：支持从共享存储读取）
 view_logs() {
     echo -e "\\n${CYAN}${BOLD}==== 查看操作日志 ====${RESET}"
     log_start "查看操作日志"
     
+    # 尝试初始化日志目录
+    init_log
+    
     if [[ ! -f "$LOG_FILE" ]]; then
         echo -e "${YELLOW}${BOLD}>> 暂无日志记录${RESET}"
+        echo -e "${CYAN}${BOLD}>> 日志路径: $LOG_FILE${RESET}"
         log_end "失败" "日志文件不存在"
         pause
         return
@@ -97,13 +135,19 @@ view_logs() {
         echo -e "  ${YELLOW}$line${RESET}"
     done
     
+    # 显示提示
+    echo -e "\\n${YELLOW}${BOLD}>> 提示: 日志文件位于手机存储的 SillyTavern/ST-Manager-Logs/ 目录${RESET}"
+    
     log_end "成功" "查看日志完成"
     pause
 }
 
-# 清理日志
+# 清理日志（修改：支持清理共享存储中的日志）
 clear_logs() {
     echo -e "\\n${CYAN}${BOLD}==== 清理日志文件 ====${RESET}"
+    
+    # 尝试初始化
+    init_log
     
     if [[ ! -f "$LOG_FILE" ]]; then
         echo -e "${YELLOW}${BOLD}>> 暂无日志${RESET}"
@@ -115,6 +159,7 @@ clear_logs() {
     local size_mb=$(awk "BEGIN {printf \"%.2f\", $log_size/1024/1024}")
     
     echo -e "${YELLOW}${BOLD}>> 当前日志大小: ${size_mb} MB${RESET}"
+    echo -e "${CYAN}${BOLD}>> 日志路径: $LOG_FILE${RESET}"
     echo -ne "${YELLOW}${BOLD}>> 确认清空日志? (y/n): ${RESET}"
     read -n1 confirm; echo
     
@@ -126,6 +171,18 @@ clear_logs() {
         echo -e "${YELLOW}${BOLD}>> 已取消${RESET}"
     fi
     pause
+}
+
+# 导出日志（新增：将日志复制到备份位置）
+export_logs() {
+    local backup_dir="/storage/emulated/0/SillyTavern"
+    local log_backup_dir="$backup_dir/ST-Manager-Logs-Backup"
+    
+    if [[ -f "$LOG_FILE" ]]; then
+        mkdir -p "$log_backup_dir" 2>/dev/null || return
+        local timestamp=$(date '+%Y%m%d_%H%M%S')
+        cp "$LOG_FILE" "$log_backup_dir/st-manager_$timestamp.log" 2>/dev/null || true
+    fi
 }
 
 # Core Arrays for Dynamic Menu
@@ -251,7 +308,7 @@ load_modules() {
         done < "$menu_file"
     done
 
-    # Add System Management Items（修改：添加版本切换和日志功能）
+    # Add System Management Items
     local sys_group="系统管理"
     local sys_items=("fix_env:修复运行环境" "update_self:更新管理工具" "settings_menu:系统设置" "version_switch:酒馆版本切换" "view_logs:查看操作日志" "clear_logs:清理日志文件" "visit_github:访问 GitHub (求星星)" "visit_discord:加入 Discord 粉丝群")
 
@@ -360,7 +417,7 @@ settings_menu() {
 }
 
 # ==============================================================================
-# 版本切换功能（新增）
+# 版本切换功能
 # ==============================================================================
 show_version_tags() {
     echo -e "\\n${CYAN}${BOLD}==== 查看版本标签 ====${RESET}"
@@ -483,7 +540,6 @@ switch_tavern_version() {
     local choice
     while true; do
         echo -ne "${CYAN}${BOLD}>> 请输入序号 (0-${idx}): ${RESET}"
-       RESET}"
         read -r choice
         [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 0 ] && [ "$choice" -le "$idx" ] && break
         echo -e "${RED}${BOLD}>> 无效输入${RESET}"
