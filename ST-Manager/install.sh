@@ -10,13 +10,13 @@ IFS=$'\n\t'
 # =========================================================================
 # 配置
 # =========================================================================
-REPO_URL="https://github.com/SillyTavern/SillyTavern"  # SillyTavern 官方仓库
+REPO_URL="https://github.com/SillyTavern/SillyTavern"
 INSTALL_DIR="$HOME/ST-Manager"
 TEMP_DIR="$(mktemp -d)"
-TOTAL_STEPS=6  # 增加步骤数到 6（新增版本选择步骤）
+TOTAL_STEPS=6
 
 # =========================================================================
-# 彩色输出定义（增强版）
+# 彩色输出定义
 # =========================================================================
 RED='\033[1;31m'
 GREEN='\033[1;32m'
@@ -34,18 +34,15 @@ current_step=0
 
 show_step() {
     current_step=$((current_step + 1))
-    local step_title="$1"
-    echo -e "\n${CYAN}${BOLD}==== 步骤 ${current_step}/${TOTAL_STEPS}：${step_title} ====${RESET}"
+    echo -e "\n${CYAN}${BOLD}==== 步骤 ${current_step}/${TOTAL_STEPS}：$1 ====${RESET}"
 }
 
 step_done() {
-    local message="${1:-完成}"
-    echo -e "${GREEN}${BOLD}>> 步骤 ${current_step}/${TOTAL_STEPS} ${message}。${RESET}"
+    echo -e "${GREEN}${BOLD}>> 步骤 ${current_step}/${TOTAL_STEPS} ${1:-完成}。${RESET}"
 }
 
 step_skip() {
-    local reason="$1"
-    echo -e "${YELLOW}${BOLD}>> 步骤 ${current_step}/${TOTAL_STEPS} 跳过：${reason}。${RESET}"
+    echo -e "${YELLOW}${BOLD}>> 步骤 ${current_step}/${TOTAL_STEPS} 跳过：$1。${RESET}"
 }
 
 info() {
@@ -65,11 +62,6 @@ err() {
     exit 1
 }
 
-press_any_key() {
-    echo -e "${CYAN}${BOLD}>> 按任意键继续...${RESET}"
-    read -n1 -s
-}
-
 # =========================================================================
 # 清理函数
 # =========================================================================
@@ -84,19 +76,17 @@ trap cleanup EXIT
 check_environment() {
     show_step "环境检测与依赖检查"
     
-    # Termux 环境检测
     if [ -z "$PREFIX" ] || [[ "$PREFIX" != *"/com.termux"* ]]; then
         warn "检测到非 Termux 环境，部分功能可能受限"
     else
         info "Termux 环境检测通过"
         
-        # 存储权限检测
         local storage_dir="$HOME/storage/shared"
         if [ ! -d "$storage_dir" ]; then
             warn "未检测到存储权限，尝试自动获取..."
             if command -v termux-setup-storage >/dev/null 2>&1; then
                 termux-setup-storage
-                info "请在弹出的窗口中点击“允许”授权，正在等待..."
+                info "请在弹出的窗口中点击允许授权，正在等待..."
                 local max_wait=15
                 for ((i=0; i<max_wait; i++)); do
                     [ -d "$storage_dir" ] && break
@@ -107,20 +97,16 @@ check_environment() {
                 else
                     warn "存储权限获取超时，部分功能可能受限"
                 fi
-            else
-                warn "termux-setup-storage 命令不存在"
             fi
         else
             info "存储权限已配置"
         fi
     fi
     
-    # 依赖检查
     info "检查依赖项..."
     local deps=(curl unzip git jq expect python openssl-tool)
     local missing=()
     
-    # 检查 nodejs
     if ! command -v node &>/dev/null; then 
         missing+=("nodejs")
     else
@@ -151,11 +137,9 @@ check_environment() {
             fi
         fi
         success "依赖安装完成"
-    else
-        info "所有依赖已就绪"
     fi
     
-    step_done "完成：环境检测与依赖检查通过"
+    step_done "环境检测与依赖检查通过"
 }
 
 # =========================================================================
@@ -184,7 +168,7 @@ download_manager_resources() {
         err "核心文件 core.sh 不存在"
     fi
     
-    step_done "完成：ST-Manager 资源已下载"
+    step_done "ST-Manager 资源已下载"
 }
 
 # =========================================================================
@@ -193,27 +177,23 @@ download_manager_resources() {
 install_manager() {
     show_step "安装 ST-Manager"
     
-    # 备份现有配置
     if [ -f "$INSTALL_DIR/conf/settings.conf" ]; then
         info "检测到现有配置，正在备份..."
         cp "$INSTALL_DIR/conf/settings.conf" "$TEMP_DIR/settings.conf.bak"
         success "配置已备份"
     fi
     
-    # 清理旧版本
     if [ -d "$INSTALL_DIR" ]; then
         info "正在移除旧版本..."
         rm -rf "$INSTALL_DIR"
         success "旧版本已清理"
     fi
     
-    # 安装文件
     info "正在安装文件到 $INSTALL_DIR..."
     mkdir -p "$INSTALL_DIR"
     cp -rf "$TEMP_DIR/repo/ST-Manager/." "$INSTALL_DIR/"
     success "文件安装完成"
     
-    # 恢复配置
     if [ -f "$TEMP_DIR/settings.conf.bak" ]; then
         info "正在恢复用户配置..."
         mkdir -p "$INSTALL_DIR/conf"
@@ -221,24 +201,22 @@ install_manager() {
         success "配置已恢复"
     fi
     
-    # 设置权限
     info "设置执行权限..."
     chmod +x "$INSTALL_DIR/core.sh"
     find "$INSTALL_DIR/modules" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
     success "权限设置完成"
     
-    step_done "完成：ST-Manager 安装结束"
+    step_done "ST-Manager 安装结束"
 }
 
 # =========================================================================
-# 步骤 4/6：版本选择（从第一个脚本嵌入的核心功能）
+# 步骤 4/6：版本选择（核心新增功能）
 # =========================================================================
 select_sillytavern_version() {
     show_step "选择 SillyTavern 版本"
     
     local st_dir="$HOME/SillyTavern"
     
-    # 检查是否已存在 SillyTavern
     if [ -d "$st_dir/.git" ]; then
         warn "检测到已存在 SillyTavern 目录"
         echo -ne "${CYAN}${BOLD}>> 是否重新安装/切换版本? (y/n): ${RESET}"
@@ -250,7 +228,6 @@ select_sillytavern_version() {
         rm -rf "$st_dir"
     fi
     
-    # 克隆仓库（浅克隆以获取标签列表）
     info "正在获取 SillyTavern 版本列表..."
     mkdir -p "$st_dir"
     if ! git clone --depth 1 --no-single-branch "$REPO_URL" "$st_dir" 2>/dev/null; then
@@ -259,15 +236,12 @@ select_sillytavern_version() {
     
     cd "$st_dir" || err "进入目录失败"
     
-    # 获取所有标签
     info "正在获取版本标签..."
     git fetch --tags 2>/dev/null || warn "无法获取远程标签，使用本地标签"
     
-    # 显示版本选择菜单
     echo -e "\n${CYAN}${BOLD}==== 可用版本 ====${RESET}"
     echo -e "${YELLOW}${BOLD}0. release 分支（最新开发版）${RESET}"
     
-    # 获取标签列表并显示
     local tags=()
     local tag_count=0
     while IFS= read -r tag; do
@@ -277,11 +251,10 @@ select_sillytavern_version() {
             local tag_date=$(git log -1 --format=%ai "$tag" 2>/dev/null | cut -d' ' -f1 || echo "未知日期")
             echo -e "${GREEN}${BOLD}${tag_count}. ${tag} (${tag_date})${RESET}"
         fi
-    done < <(git tag --sort=-creatordate | head -20)  # 显示最近20个标签
+    done < <(git tag --sort=-creatordate | head -20)
     
     echo -e "${CYAN}${BOLD}===================${RESET}"
     
-    # 用户选择
     local choice
     while true; do
         echo -ne "${CYAN}${BOLD}>> 请输入版本序号 (0-${tag_count}): ${RESET}"
@@ -294,29 +267,21 @@ select_sillytavern_version() {
         fi
     done
     
-    # 切换到选定版本
     if [ "$choice" -eq 0 ]; then
         info "选择安装 release 分支..."
-        git checkout -f origin/release 2>/dev/null || git checkout -f release 2>/dev/null || {
-            # 如果 release 分支不存在，使用默认分支
-            git checkout -f HEAD
-        }
+        git checkout -f origin/release 2>/dev/null || git checkout -f release 2>/dev/null || git checkout -f HEAD
         success "已切换到 release 分支"
     else
         local selected_tag="${tags[$((choice-1))]}"
         info "选择安装版本: ${selected_tag}"
-        
-        # 切换到指定标签
         if ! git checkout -f "tags/${selected_tag}" 2>/dev/null; then
             err "切换到版本 ${selected_tag} 失败"
         fi
         success "已切换到版本 ${selected_tag}"
     fi
     
-    # 清理 git 历史以节省空间（可选）
     rm -rf .git
-    
-    step_done "完成：版本选择结束"
+    step_done "版本选择结束"
 }
 
 # =========================================================================
@@ -334,18 +299,15 @@ install_sillytavern_deps() {
     
     cd "$st_dir" || err "进入 SillyTavern 目录失败"
     
-    # 清理旧依赖
     if [ -d "node_modules" ]; then
         info "清理旧依赖..."
         rm -rf node_modules
     fi
     
-    # 清理 npm 缓存
     if [ -d "$HOME/.npm/_cacache" ]; then
         npm cache clean --force 2>/dev/null || true
     fi
     
-    # 安装依赖（带重试机制）
     export NODE_ENV=production
     local retry_count=0
     local max_retries=3
@@ -378,7 +340,7 @@ install_sillytavern_deps() {
         err "依赖安装失败，已重试 ${max_retries} 次，请检查网络连接"
     fi
     
-    step_done "完成：依赖安装结束"
+    step_done "依赖安装结束"
 }
 
 # =========================================================================
@@ -387,7 +349,6 @@ install_sillytavern_deps() {
 setup_commands() {
     show_step "创建系统命令与自动启动配置"
     
-    # 创建全局命令
     if [ -d "$PREFIX/bin" ]; then
         info "创建全局命令 'st-menu'..."
         cat > "$PREFIX/bin/st-menu" << 'EOF'
@@ -396,18 +357,14 @@ bash $HOME/ST-Manager/core.sh
 EOF
         chmod +x "$PREFIX/bin/st-menu"
         success "全局命令 'st-menu' 已创建"
-    else
-        warn "未检测到 $PREFIX/bin 目录，跳过全局命令创建"
     fi
     
-    # 自动启动配置（交互式）
     echo -e "\n${CYAN}${BOLD}>> 是否配置 Termux 启动时自动运行 ST-Manager？${RESET}"
     read -rp "启用自动启动? (y/n): " choice
     if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
         local bashrc="$HOME/.bashrc"
         local cmd="bash $INSTALL_DIR/core.sh"
         
-        # 检查是否已存在
         if grep -q "$cmd" "$bashrc" 2>/dev/null; then
             step_skip "自动启动已配置"
         else
@@ -418,7 +375,7 @@ EOF
         info "已跳过自动启动配置"
     fi
     
-    step_done "完成：命令配置结束"
+    step_done "命令配置结束"
 }
 
 # =========================================================================
@@ -434,7 +391,6 @@ finish_installation() {
     echo -e "   • 完整路径：${YELLOW}bash $INSTALL_DIR/core.sh${RESET}"
     echo -e "${GREEN}${BOLD}========================================${RESET}"
     
-    # 询问是否立即启动
     echo -e "\n${CYAN}${BOLD}>> 是否立即启动 ST-Manager？${RESET}"
     read -rp "立即启动? (y/n): " start
     if [[ "$start" == "y" || "$start" == "Y" ]]; then
@@ -463,8 +419,8 @@ main() {
     check_environment
     download_manager_resources
     install_manager
-    select_sillytavern_version      # 新增：版本选择步骤
-    install_sillytavern_deps        # 新增：安装依赖步骤
+    select_sillytavern_version
+    install_sillytavern_deps
     setup_commands
     finish_installation
 }
