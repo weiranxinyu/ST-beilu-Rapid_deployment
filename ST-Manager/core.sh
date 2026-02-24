@@ -20,10 +20,6 @@ CONF_DIR="$DIR/conf"
 MODULES_DIR="$DIR/modules"
 SETTINGS_FILE="$CONF_DIR/settings.conf"
 
-# 日志路径（修改：和备份文件夹一样，在共享存储中）
-LOG_DIR="/storage/emulated/0/SillyTavern/ST-Manager-Logs"
-LOG_FILE="$LOG_DIR/st-manager.log"
-
 # Colors
 RED='\033[31m'
 GREEN='\033[32m'
@@ -34,9 +30,22 @@ MAGENTA='\033[1;35m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
+# 实时日志颜色（新增）
+LOG_COLOR_DEBUG='\033[38;5;240m'
+LOG_COLOR_INFO='\033[38;5;39m'
+LOG_COLOR_SUCCESS='\033[38;5;82m'
+LOG_COLOR_WARN='\033[38;5;208m'
+LOG_COLOR_ERROR='\033[38;5;196m'
+LOG_COLOR_SYSTEM='\033[38;5;141m'
+LOG_COLOR_TIME='\033[38;5;248m'
+LOG_COLOR_EMOJI='\033[38;5;229m'
+
 # ==============================================================================
-# 日志系统（修改：使用共享存储路径）
+# 日志系统（修改：和备份文件夹一样，在共享存储中）
 # ==============================================================================
+LOG_DIR="/storage/emulated/0/SillyTavern/ST-Manager-Logs"
+LOG_FILE="$LOG_DIR/st-manager.log"
+REALTIME_LOG="$LOG_DIR/sillytavern-runtime.log"
 
 # 检查并获取存储权限
 check_storage_permission() {
@@ -50,28 +59,26 @@ check_storage_permission() {
     fi
 }
 
-# 初始化日志（修改：创建共享存储中的日志目录）
+# 初始化日志
 init_log() {
     check_storage_permission
     
-    # 创建 SillyTavern 主目录（如果不存在）
     local st_dir="/storage/emulated/0/SillyTavern"
     if [[ ! -d "$st_dir" ]]; then
         mkdir -p "$st_dir" 2>/dev/null || {
-            # 如果无法创建，回退到应用目录
             LOG_DIR="$APP_DIR/logs"
             LOG_FILE="$LOG_DIR/st-manager.log"
+            REALTIME_LOG="$LOG_DIR/sillytavern-runtime.log"
             mkdir -p "$LOG_DIR"
             return
         }
     fi
     
-    # 创建日志目录
     if [[ ! -d "$LOG_DIR" ]]; then
         mkdir -p "$LOG_DIR" 2>/dev/null || {
-            # 如果无法创建，回退到应用目录
             LOG_DIR="$APP_DIR/logs"
             LOG_FILE="$LOG_DIR/st-manager.log"
+            REALTIME_LOG="$LOG_DIR/sillytavern-runtime.log"
             mkdir -p "$LOG_DIR"
         }
     fi
@@ -103,12 +110,18 @@ log_end() {
     write_log "INFO" "========================================"
 }
 
-# 查看日志（修改：支持从共享存储读取）
+# 初始化实时日志（新增）
+init_realtime_log() {
+    init_log
+    mkdir -p "$LOG_DIR" 2>/dev/null || true
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] === SillyTavern 实时日志开始 ===" >> "$REALTIME_LOG" 2>/dev/null || true
+}
+
+# 查看日志
 view_logs() {
     echo -e "\\n${CYAN}${BOLD}==== 查看操作日志 ====${RESET}"
     log_start "查看操作日志"
     
-    # 尝试初始化日志目录
     init_log
     
     if [[ ! -f "$LOG_FILE" ]]; then
@@ -118,6 +131,8 @@ view_logs() {
         pause
         return
     fi
+    
+    local fi
     
     local total_lines=$(wc -l < "$LOG_FILE" 2>/dev/null || echo "0")
     local log_size=$(stat -c%s "$LOG_FILE" 2>/dev/null || stat -f%z "$LOG_FILE" 2>/dev/null || echo "0")
@@ -135,18 +150,16 @@ view_logs() {
         echo -e "  ${YELLOW}$line${RESET}"
     done
     
-    # 显示提示
     echo -e "\\n${YELLOW}${BOLD}>> 提示: 日志文件位于手机存储的 SillyTavern/ST-Manager-Logs/ 目录${RESET}"
     
     log_end "成功" "查看日志完成"
     pause
 }
 
-# 清理日志（修改：支持清理共享存储中的日志）
+# 清理日志
 clear_logs() {
     echo -e "\\n${CYAN}${BOLD}==== 清理日志文件 ====${RESET}"
     
-    # 尝试初始化
     init_log
     
     if [[ ! -f "$LOG_FILE" ]]; then
@@ -171,18 +184,6 @@ clear_logs() {
         echo -e "${YELLOW}${BOLD}>> 已取消${RESET}"
     fi
     pause
-}
-
-# 导出日志（新增：将日志复制到备份位置）
-export_logs() {
-    local backup_dir="/storage/emulated/0/SillyTavern"
-    local log_backup_dir="$backup_dir/ST-Manager-Logs-Backup"
-    
-    if [[ -f "$LOG_FILE" ]]; then
-        mkdir -p "$log_backup_dir" 2>/dev/null || return
-        local timestamp=$(date '+%Y%m%d_%H%M%S')
-        cp "$LOG_FILE" "$log_backup_dir/st-manager_$timestamp.log" 2>/dev/null || true
-    fi
 }
 
 # Core Arrays for Dynamic Menu
@@ -281,7 +282,6 @@ load_modules() {
             # Group Header: [GroupName]
             if [[ "$line" =~ ^\[(.*)\] ]]; then
                 current_group="${BASH_REMATCH[1]}"
-                # Trim CR if present
                 current_group="${current_group%$'\r'}"
                 GROUP_TO_MODULE_MAP["$current_group"]="$module_name"
 
@@ -290,7 +290,6 @@ load_modules() {
                 local key="${BASH_REMATCH[1]}"
                 local text="${BASH_REMATCH[2]}"
 
-                # Trim whitespace/newlines from key and text
                 key=$(echo "$key" | tr -d '[:space:]')
                 text=$(echo "$text" | tr -d '\r')
 
@@ -298,7 +297,6 @@ load_modules() {
                 FUNCTION_MAP["$key"]="$key"
                 MODULE_GROUPS["$current_group,$key"]="$text"
 
-                # Append to order list for this group
                 if [[ -z "${MODULE_GROUP_ORDER[$current_group]}" ]]; then
                     MODULE_GROUP_ORDER["$current_group"]="$key"
                 else
@@ -331,9 +329,8 @@ fix_env() {
     
     if [[ "$PREFIX" == *"/com.termux"* ]]; then
         pkg update -y
-        pkg install -y curl unzip git nodejs-lts jq expect python openssl-tool procps
+        pkg install -y curl unzip git nodejs-lts jq expect python openssl-tool procps inotify-tools
 
-        # Install PM2 if missing
         if ! command -v pm2 &>/dev/null; then
             echo -e "${YELLOW}正在安装 PM2 进程管理器...${RESET}"
             npm install -g pm2
@@ -353,7 +350,6 @@ update_self() {
     
     cd "$APP_DIR" || return
 
-    # 配置 git 代理
     if [[ "$USE_PROXY" == "true" && -n "$PROXY_URL" ]]; then
         git config http.proxy "$PROXY_URL"
         git config https.proxy "$PROXY_URL"
@@ -362,7 +358,6 @@ update_self() {
         git config --unset https.proxy
     fi
 
-    # 尝试更新
     if git pull; then
         success "更新成功！正在重启..."
         log_end "成功" "更新成功"
@@ -490,7 +485,6 @@ switch_tavern_version() {
         return
     fi
     
-    # 检查依赖
     for cmd in node npm git; do
         if ! command -v $cmd >/dev/null 2>&1; then
             echo -e "${RED}${BOLD}>> 缺少依赖: $cmd${RESET}"
@@ -502,7 +496,6 @@ switch_tavern_version() {
         fi
     done
     
-    # 检查未提交更改
     if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
         echo -e "${YELLOW}${BOLD}>> 警告: 有未提交的更改，切换将丢失！${RESET}"
         echo -ne "${YELLOW}${BOLD}>> 继续? (y/n): ${RESET}"
@@ -519,7 +512,6 @@ switch_tavern_version() {
     local current=$(git describe --tags --exact-match 2>/dev/null || echo "release")
     echo -e "${YELLOW}${BOLD}>> 当前版本: ${current}${RESET}"
     
-    # 获取标签
     git fetch --tags 2>/dev/null || true
     
     echo -e "\\n${CYAN}${BOLD}==== 可用版本 ====${RESET}"
@@ -545,7 +537,6 @@ switch_tavern_version() {
         echo -e "${RED}${BOLD}>> 无效输入${RESET}"
     done
     
-    # 执行切换
     if [ "$choice" -eq 0 ]; then
         echo -e "${CYAN}${BOLD}>> 切换到 release 分支...${RESET}"
         if git checkout -f origin/release 2>/dev/null || git checkout -f release 2>/dev/null || git checkout -f HEAD; then
@@ -575,7 +566,6 @@ switch_tavern_version() {
         fi
     fi
     
-    # 重新安装依赖
     echo -e "${CYAN}${BOLD}>> 重新安装依赖...${RESET}"
     export NODE_ENV=production
     rm -rf node_modules 2>/dev/null || true
@@ -630,7 +620,6 @@ EOF
     pause
 }
 
-# 版本切换子菜单
 version_switch() {
     while true; do
         clear
@@ -681,6 +670,108 @@ visit_discord() {
 }
 
 # ==============================================================================
+# 实时日志美化显示系统（新增）
+# ==============================================================================
+
+# 美化输出一行日志
+beautify_log_line() {
+    local line="$1"
+    local timestamp=$(date '+%H:%M:%S')
+    
+    # 写入原始日志
+    echo "[$timestamp] $line" >> "$REALTIME_LOG" 2>/dev/null || true
+    
+    # 根据内容类型美化显示
+    case "$line" in
+        # 成功信息
+        *"successfully"*|*"Successfully"*|*"done"*|*"Done"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_SUCCESS}✓${RESET} ${LOG_COLOR_SUCCESS}${line}${RESET}"
+            ;;
+        # 错误信息
+        *"error"*|*"Error"*|*"ERROR"*|*"failed"*|*"Failed"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_ERROR}✗${RESET} ${LOG_COLOR_ERROR}${line}${RESET}"
+            ;;
+        # 警告信息
+        *"warn"*|*"Warn"*|*"WARN"*|*"warning"*|*"Warning"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_WARN}⚠${RESET} ${LOG_COLOR_WARN}${line}${RESET}"
+            ;;
+        # 服务器启动
+        *"Server running"*|*"listening on"*|*"SillyTavern is listening"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_SUCCESS}🚀${RESET} ${LOG_COLOR_SUCCESS}${line}${RESET}"
+            write_log "INFO" "SillyTavern 服务器已启动"
+            ;;
+        # URL 地址
+        *"http://"*|*"https://"*|*"Go to:"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_INFO}🔗${RESET} ${LOG_COLOR_INFO}${line}${RESET}"
+            ;;
+        # 编译信息
+        *"Compiling"*|*"webpack"*|*"compiled"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_SYSTEM}⚙${RESET} ${LOG_COLOR_SYSTEM}${line}${RESET}"
+            ;;
+        # 扩展/插件加载
+        *"Extensions"*|*"Extension"*|*"Loading"*|*"Loaded"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_EMOJI}📦${RESET} ${line}"
+            ;;
+        # 角色卡相关
+        *"character"*|*"Character"*|*"avatar"*|*"Avatar"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_EMOJI}👤${RESET} ${line}"
+            ;;
+        # 聊天相关
+        *"chat"*|*"Chat"*|*"message"*|*"Message"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_EMOJI}💬${RESET} ${line}"
+            ;;
+        # API 请求
+        *"Generating"*|*"generate"*|*"API"*|*"api"*|*"tokenizer"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_INFO}🤖${RESET} ${LOG_COLOR_INFO}${line}${RESET}"
+            ;;
+        # 数据复制/移动
+        *"Copied"*|*"copied"*|*"Copying"*|*"copy"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_INFO}📋${RESET} ${line}"
+            ;;
+        # 图片/背景
+        *"Image"*|*"image"*|*"background"*|*"Background"*)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_EMOJI}🖼${RESET} ${line}"
+            ;;
+        # 默认信息
+        *)
+            echo -e "${LOG_COLOR_TIME}[${timestamp}]${RESET} ${LOG_COLOR_INFO}ℹ${RESET} ${line}"
+            ;;
+    esac
+}
+
+# 显示启动横幅
+show_start_banner() {
+    clear
+    echo -e "${LOG_COLOR_SYSTEM}"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║           SillyTavern 实时运行监控                           ║"
+    echo "║           Real-time Runtime Monitor                          ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo -e "${RESET}"
+    echo -e "${LOG_COLOR_INFO}启动时间: $(date '+%Y-%m-%d %H:%M:%S')${RESET}"
+    echo -e "${LOG_COLOR_INFO}日志文件: $REALTIME_LOG${RESET}"
+    echo -e "${LOG_COLOR_WARN}提示: 按 Ctrl+C 停止服务器${RESET}\\n"
+    echo -e "${LOG_COLOR_SYSTEM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\\n"
+}
+
+# 显示停止摘要
+show_stop_summary() {
+    local start_time="$1"
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    local minutes=$((duration / 60))
+    local seconds=$((duration % 60))
+    
+    echo -e "\\n${LOG_COLOR_SYSTEM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${LOG_COLOR_WARN}SillyTavern 已停止${RESET}"
+    echo -e "${LOG_COLOR_INFO}运行时长: ${minutes}分${seconds}秒${RESET}"
+    echo -e "${LOG_COLOR_INFO}日志保存至: $REALTIME_LOG${RESET}"
+    echo -e "${LOG_COLOR_SYSTEM}═══════════════════════════════════════════════════════════════${RESET}\\n"
+    
+    write_log "INFO" "SillyTavern 停止，运行时长: ${minutes}分${seconds}秒"
+}
+
+# ==============================================================================
 # Main Menu
 # ==============================================================================
 show_banner() {
@@ -703,7 +794,6 @@ show_group_menu() {
         clear
         echo -e "${BLUE}=== $group_name ===${RESET}"
 
-        # Status Check (Context aware)
         local module_name="${GROUP_TO_MODULE_MAP[$group_name]}"
         if [[ "$module_name" == "sillytavern" ]]; then
             if declare -f st_status_text > /dev/null; then st_status_text; fi
@@ -749,7 +839,6 @@ main_menu() {
     while true; do
         show_banner
 
-        # Global Status Summary
         echo -e "${YELLOW}[状态监控]${RESET}"
         if declare -f st_status_text > /dev/null; then st_status_text; fi
         if declare -f gcli_status_text > /dev/null; then gcli_status_text; fi
